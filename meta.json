@@ -1,0 +1,10 @@
+{
+	"name": "Preview Slideshow (Shigeyuki) - mod kaiu 2026",
+	"mod": 1772277659,
+	"min_point_version": 1,
+	"max_point_version": 250920,
+	"branch_index": 0,
+	"disabled": false,
+	"update_enabled": true,
+	"conflicts": ["1621302762", "90397199"]
+}

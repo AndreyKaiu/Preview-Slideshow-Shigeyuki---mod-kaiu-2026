@@ -1,5 +1,13 @@
 # anki-preview-slideshow
 
+- The ability to translate the add-on into your own language has been added to the "Language" setting in the settings.
+
+- The ability to keep the card viewer window on top of all other windows in the system has been added to the "WindowStaysOnTop" setting in the settings.
+
+- Improved MPlayer functionality (rewind, playback). However, this is probably no longer needed by many.
+
+- The most important feature is the ability to view cards without switching to the "Overview" window and the ability to immediately mark them (for example, you can mark cards in red that will later be added to a filtered deck for replay). When randomly selecting a card, you can return to the same position from the table in the "Overview" window. This is a simple history of positions (not cards!), so if you change the sorting in the card table, the positions will no longer be correct. If you select cards randomly, the risk of accidentally ending up in the same index from the table is minimized. And various other improvements, some visible, others not.
+  
 ![ver09](https://github.com/user-attachments/assets/7a58c5a6-4034-42f9-a69e-6f6d662a1ac8)
 
 
@@ -72,4 +80,5 @@ Version 0.2
 
 Version 0.1
 - Initial release
+
 

@@ -1,5 +1,8 @@
 # anki-preview-slideshow
 
+![ver09](https://github.com/user-attachments/assets/7a58c5a6-4034-42f9-a69e-6f6d662a1ac8)
+
+
 **Make Anki preview window as slideshow. For each card, it also introduce a media window to show external media files(not stored in Anki DB) like mp4, mp3, jpg, etc. External media window can be disabled, of course.**
 
 
@@ -69,3 +72,4 @@ Version 0.2
 
 Version 0.1
 - Initial release
+

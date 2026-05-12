@@ -54,6 +54,10 @@
 1. Source code can be found on https://github.com/tosimplicity/anki-preview-slideshow
 2. This add-on is licensed under GPL v3, or higher
 
+## VERSIONS
+- 0.9, date: 2026-05-12.  Fixed the appearance of buttons under dark and light themes.
+- 0.9, date: 2026-03-01.
+- 
 ## Version History
 
 Version 0.8

@@ -1065,6 +1065,7 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
         tooltip="",
         checkable=False        
     ):
+                
         b = QPushButton()
         b.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         b.setCheckable(checkable)
@@ -1072,11 +1073,31 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
         b.setIconSize(QSize(icon_size, icon_size))
         b.setFixedSize(btn_size, btn_size)
         b.setToolTip(tooltip)
+        
+        b.setStyleSheet("""   
+         QPushButton {                            
+               /*background: rgba(80, 80, 80, 0.5);*/
+               /*color: #aaa;*/
+               /*font-size: 11px;*/
+               padding: 0px;
+               left: 0px;
+               right: 0px;
+               top: 0px;
+               bottom: 0px;
+               margin: 0px;
+               text-align: center;
+               font-family: "Segoe UI Emoji";
+               background-color: transparent;
+         }
+         """)
+        
         if icon:
             b.setIcon(icon)            
         if text:
             b.setText(text)
-        b.setContentsMargins(0, 0, 0, 0)    
+        
+        b.setContentsMargins(0, 0, 0, 0)
+        
 
         # b.setStyleSheet("""   
         # QPushButton {

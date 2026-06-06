@@ -1075,20 +1075,29 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
         b.setToolTip(tooltip)
         
         b.setStyleSheet("""   
-         QPushButton {                            
-               /*background: rgba(80, 80, 80, 0.5);*/
-               /*color: #aaa;*/
-               /*font-size: 11px;*/
-               padding: 0px;
-               left: 0px;
-               right: 0px;
-               top: 0px;
-               bottom: 0px;
-               margin: 0px;
-               text-align: center;
-               font-family: "Segoe UI Emoji";
-               background-color: transparent;
-         }
+        QPushButton {                            
+           /*background: rgba(80, 80, 80, 0.5);*/
+           /*color: #aaa;*/
+           /*font-size: 11px;*/
+           padding: 0px;
+           left: 0px;
+           right: 0px;
+           top: 0px;
+           bottom: 0px;
+           margin: 0px;
+           text-align: center;
+           font-family: "Segoe UI Emoji";
+           background-color: transparent;
+        }
+
+        QPushButton:checked {
+            border: 1px solid rgba(122, 224, 251, 0.8);
+            border-radius: 4px;
+        }
+
+        QPushButton:disabled {
+            color: gray;
+        }
          """)
         
         if icon:

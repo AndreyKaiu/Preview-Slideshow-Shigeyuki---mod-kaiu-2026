@@ -31,7 +31,7 @@ from . import config_addon as mcon
 
 from .utils import decode_sp
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
 
 # Packaged commands
@@ -154,7 +154,7 @@ class MplayerMsgQueueParser(threading.Thread):
                     continue
                 if "EOF code" in line:
                     completed_play_notice.set()
-                    logger.debug("Got std out eof: %s" % line)
+                    # logger.debug("Got std out eof: %s" % line)
                     break
                 if not media_length:
                     length_block = re.search(r"ID_LENGTH=(\d+\.*\d*)", line)
@@ -165,7 +165,7 @@ class MplayerMsgQueueParser(threading.Thread):
                         if media_length < 1:
                             media_length = 1
                 if media_length and time.time() - start_time > media_length + 3:
-                    logger.debug("playing over time: %s" % media_length)
+                    # logger.debug("playing over time: %s" % media_length)
                     break
 
 
@@ -213,7 +213,7 @@ class MplayerMonitor(threading.Thread):
                     self.mplayer.stdin.flush()
                 except:
                     # mplayer has quit and needs restarting
-                    logger.info("restart mplayer")
+                    # logger.info("restart mplayer")
                     self.deadPlayers.append(self.mplayer)
                     self.mplayer = None
                     try:
@@ -224,7 +224,7 @@ class MplayerMonitor(threading.Thread):
                     if start_sec:
                         self.mplayer.stdin.write(seek_cmd)
                     self.mplayer.stdin.flush()
-                logger.debug("mplay cmd: %s" % cmd)
+                # logger.debug("mplay cmd: %s" % cmd)
                 media_in_play = media_to_play
                 media_to_play = ""
                 # if we feed mplayer too fast it loses files
@@ -279,7 +279,7 @@ class MplayerMonitor(threading.Thread):
                     cmd, startupinfo=si, stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                     env=env)
-            logger.debug("start mplayer: %s" % cmd)
+            # logger.debug("start mplayer: %s" % cmd)
 
             def read_stdout_to_queue(mplayer):
                 while True:
@@ -397,7 +397,7 @@ def setup(wid=0):
     global wid_mplayer_container
     if wid_mplayer_container != wid:
         stopMplayer()
-        logger.debug("Using a new window ID for video playing %s" % wid)
+        # logger.debug("Using a new window ID for video playing %s" % wid)
     wid_mplayer_container = wid
 
 def pause():
@@ -424,7 +424,7 @@ def volume_change(delta: int):
         pass
 
 def play(path, start_sec=0, end_sec=0):
-    logger.info("mplayer interface in: %s" % path)
+    # logger.info("mplayer interface in: %s" % path)
     global mplay_readiness_state
     if mplay_readiness_state == 'failed and notified':
         completed_play_notice.set()

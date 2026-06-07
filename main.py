@@ -68,7 +68,7 @@ from . import mplayer_extended
 
 from .shige_config.shige_buttons import add_shige_buttons
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
 MEDIAS = (".mp4", ".mkv", ".avi", ".flv", ".m4v", ".f4v", ".rmvb",
           ".mpg", ".mpeg", ".mov", ".mp3", ".flac", ".m4a")
@@ -303,9 +303,10 @@ Previewer.open = new_previewer_open
 
 def setup_preview_slideshow(browser:Browser):
     # "prepare when browser window shows up."    
-    logger.debug("setup_preview_slideshow(target_browser)")
+    # logger.debug("setup_preview_slideshow(target_browser)")
     if browser:        
-        logger.debug("setup_preview_slideshow browser existing")
+        #logger.debug("setup_preview_slideshow browser existing")
+        pass
     else:
         return
 
@@ -429,7 +430,7 @@ def setup_preview_slideshow(browser:Browser):
 
 def add_slideshow_ui_to_preview_window(browser: Browser):
     """ Add custom slideshow UI elements below standard preview buttons """
-    logger.debug("setup_preview_slideshow(target_browser)")    
+    # logger.debug("setup_preview_slideshow(target_browser)")    
 
     global slideshow_profile
 
@@ -808,7 +809,7 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
             gl.preview_window.slideshow_media_window.close()
         except Exception:
             pass
-        logger.info("stopped slideshow")
+        # logger.info("stopped slideshow")
 
 
     def on_switch_preview_slideshow(switch_state):
@@ -847,7 +848,7 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
         slideshow_preview_thread.signals.request_change_windows_stack_signal.connect(_arrange_windows_stack_sequence)
         thread_pool = QThreadPool.globalInstance()
         thread_pool.start(slideshow_preview_thread)
-        logger.info("----------started preview slideshow thread----------")
+        # logger.info("----------started preview slideshow thread----------")
 
         return
 
@@ -876,11 +877,14 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
         or not any([path.lower().endswith(ext) for ext in MEDIAS + PICTURES]) \
         or not gl.preview_window or not browser:
             if not (gl.preview_window and browser):
-                logger.debug("show ext media denied: no browser/preview_window")
+                # logger.debug("show ext media denied: no browser/preview_window")
+                pass
             elif not (os.path.isfile(path)):
-                logger.debug("show ext media denied: '%s' not existing" % path)
+                # logger.debug("show ext media denied: '%s' not existing" % path)
+                pass
             elif not any([path.lower().endswith(ext) for ext in MEDIAS + PICTURES]):
-                logger.debug("show ext media denied: '%s' not in ext %s" % (path, repr(MEDIAS + PICTURES)))
+                # logger.debug("show ext media denied: '%s' not in ext %s" % (path, repr(MEDIAS + PICTURES)))
+                pass
             slideshow_profile["show_external_media_event"].set()
             return
         global slideshow_media_window_area
@@ -888,18 +892,18 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
             if not gl.preview_window.slideshow_media_window.isVisible():
                 gl.preview_window.slideshow_media_window = SlideshowMediaWindow(gl.preview_window.parent(),
                                                                             slideshow_media_window_area)
-                logger.info("started new slideshow media window")
+                # logger.info("started new slideshow media window")
         except Exception:
             gl.preview_window.slideshow_media_window = SlideshowMediaWindow(gl.preview_window.parent(),
                                                                         slideshow_media_window_area)
-            logger.info("started new slideshow media window")
+            # logger.info("started new slideshow media window")
         try:
             if any([path.lower().endswith(ext) for ext in MEDIAS]):
                 gl.preview_window.slideshow_media_window.show_video(path)
-                logger.debug("sent ext medio play request %s" % path)
+                # logger.debug("sent ext medio play request %s" % path)
             else:
                 gl.preview_window.slideshow_media_window.show_pic(path)
-                logger.debug("sent ext pic show request %s" % path)
+                # logger.debug("sent ext pic show request %s" % path)
             if slideshow_profile["external_media_show_mode"] == "on_and_backoff_if_empty":
                 if not any([path.lower().endswith(ext) for ext in AUDIOS]):
                     _arrange_windows_stack_sequence("slideshow_media_window")
@@ -937,7 +941,8 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
                 anki_replay_audio(
                     browser.card, slideshow_profile["is_showing_question"])
             except Exception as error:
-                logger.debug('Replay Audio Error: ' + str(error))
+                # logger.debug('Replay Audio Error: ' + str(error))
+                pass
 
 
     def turn_to_next_slide_preview(flag_go_next):
@@ -968,9 +973,10 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
                     mw.addon_RTMD.relate_to_my_doc(card)
             except Exception as error:
                 import traceback
-                logger.debug(
-                    'Fail to activate RelateToMyDoc plugin: '
-                    + str(traceback.format_exc()))
+                # logger.debug(
+                #     'Fail to activate RelateToMyDoc plugin: '
+                #    + str(traceback.format_exc()))
+                pass
         elif not slideshow_profile["random_sequence"]:
             if app_version_micro() >= 45:
                 canForward = browser.table.has_next()
@@ -1477,7 +1483,7 @@ class ExternalMediaVolumeControlSlider(QSlider):
 
     def set_volume(self, volume):
         self.volume = volume
-        mcon.set_gs_ns("mplayer_startup_volume", volume) 
+        mcon.set_gs("mplayer_startup_volume", volume) 
         loc = mcon.get_loc("Current","Current") 
         self.setToolTip(f"{loc} - %s%%" % volume)
         QToolTip.showText(QCursor.pos(), "%s%%" % volume, self)
@@ -1500,7 +1506,7 @@ class ExternalMediaVolumeControlSlider(QSlider):
 
     def closeEvent(self, event):
         mcon.write_config(config)        
-        logger.debug("External Media Volume Set to %s" % self.volume)
+        # logger.debug("External Media Volume Set to %s" % self.volume)
         super().closeEvent(event)
 
 

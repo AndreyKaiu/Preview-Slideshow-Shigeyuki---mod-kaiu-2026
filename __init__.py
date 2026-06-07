@@ -31,23 +31,25 @@ from anki.utils import pointVersion as app_version_micro
 from .shige_config.popup_config import set_gui_hook_change_log
 set_gui_hook_change_log()
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 f_handler = TimedRotatingFileHandler(
     get_path("addon_log"), when='D', interval=7, backupCount=1, encoding="utf-8")
 f_handler.setFormatter(logging.Formatter("%(asctime)s.%(msecs)03d-%(module)20s-%(levelname)5s>> %(message)s",
                                          "%y%m%d %H%M%S"))
 f_handler.setLevel(logging.DEBUG)
-logger.addHandler(f_handler)
+# logger.addHandler(f_handler)
 config = mw.addonManager.getConfig(__name__)
 if config.get("debug", False):
-    logger.setLevel(logging.DEBUG)
+    # logger.setLevel(logging.DEBUG)
+    pass
 else:
-    logger.setLevel(logging.INFO)
-logger.info("\n" * 3 + " - Start Add-on - " + "\n" * 2)
+    # logger.setLevel(logging.INFO)
+    pass
+# logger.info("\n" * 3 + " - Start Add-on - " + "\n" * 2)
 
 if app_version_micro() >= 20:
     # using new style hook
-    logger.info("Anki version = " + appVersion)
+    # logger.info("Anki version = " + appVersion)
     from aqt import gui_hooks
     gui_hooks.browser_menus_did_init.append(setup_preview_slideshow)
     # gui_hooks.card_review_webview_did_init.append(previewer_init)

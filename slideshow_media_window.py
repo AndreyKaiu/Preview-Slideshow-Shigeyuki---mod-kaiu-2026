@@ -38,7 +38,7 @@ except ImportError:
 from . import mplayer_extended
 from . import config_addon as mcon
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
 
 
@@ -142,7 +142,7 @@ class SlideshowMediaWindow(QDialog):
         # some say the winId change all the time...so...
         mplayer_extended.setup(int(self.media_container.winId()))
         self.media_show_completed_notice = mplayer_extended.play(path)
-        logger.debug("ext-media-win showed video: %s" % path)
+        # logger.debug("ext-media-win showed video: %s" % path)
         self.last_media_path = path
         self.stop_media_show = mplayer_extended.stop
 
@@ -163,7 +163,7 @@ class SlideshowMediaWindow(QDialog):
                                                  aspectRatioMode=Qt.AspectRatioMode.KeepAspectRatio,
                                                  transformMode=Qt.TransformationMode.SmoothTransformation)
             self.media_container.setPixmap(scaled_image)
-            logger.debug("ext-media-win showed pic: %s" % path)
+            # logger.debug("ext-media-win showed pic: %s" % path)
             self.stop_media_show = lambda: None
             self.media_show_completed_notice = None
         else:
@@ -196,7 +196,7 @@ class SlideshowMediaWindow(QDialog):
                     self.media_show_completed_notice.set()
             self.pic_image.frameChanged.connect(frameChanged_Handler)
             self.pic_image.start()
-            logger.debug("ext-media-win showed gif: %s" % path)
+            # logger.debug("ext-media-win showed gif: %s" % path)
 
             def stop_gif():
                 try:

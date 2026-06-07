@@ -24,7 +24,7 @@ from aqt import appVersion
 from .utils import app_version_micro
 from anki.utils import pointVersion as app_version_micro
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
 
 
 class SlideshowPreviewThreadSignals(QObject):
@@ -115,13 +115,15 @@ class SlideshowPreviewThread(QRunnable):
                     preview_state = self.preview_window._state
                 else:
                     preview_state = self.browser._previewState
-                if logger.level == logging.DEBUG:
-                    if app_version_micro() >= 20:
-                        debug_card_question = self.browser.card.render_output().question_text
-                    else:
-                        debug_card_question = self.browser.card._getQA()['q']
-                else:
-                    debug_card_question = ''
+                # if logger.level == logging.DEBUG:
+                #     if app_version_micro() >= 20:
+                #         debug_card_question = self.browser.card.render_output().question_text
+                #     else:
+                #         debug_card_question = self.browser.card._getQA()['q']
+                # else:
+                #     debug_card_question = ''
+                debug_card_question = ''
+                
                 if preview_state == "question":
                     # default values
                     self.slideshow_profile["is_timeout_special"] = False
@@ -139,12 +141,12 @@ class SlideshowPreviewThread(QRunnable):
                         if not timeout_tag_match:
                             timeout_tag_match = timeout_in_tag_pattern.match(tag)
                             if timeout_tag_match:
-                                logger.debug("Card with time tag: %s" % tag + debug_card_question)
+                                # logger.debug("Card with time tag: %s" % tag + debug_card_question)
                                 self.slideshow_profile["is_timeout_special"] = True
                                 self.slideshow_profile["special_timeout"] = int(timeout_tag_match.group(1))
                     if self.slideshow_profile["is_showing_question"]:
                         self.slideshow_profile["timeout"] = self.slideshow_profile["q_time"]
-                        logger.debug("use question timeout: " + debug_card_question)
+                        #logger.debug("use question timeout: " + debug_card_question)
                         if self.slideshow_profile["external_media_show_mode"] == "on_and_backoff_if_empty":
                             self.signals.request_change_windows_stack_signal.emit("preview_window")
                     else:
@@ -154,13 +156,13 @@ class SlideshowPreviewThread(QRunnable):
                         if self.external_media_show_completed_notice:
                             # showing external media
                             self.slideshow_profile["timeout"] = 60 * 60 * 24
-                            logger.debug("timeout - wait for ext media play: " + debug_card_question)
+                            # logger.debug("timeout - wait for ext media play: " + debug_card_question)
                         elif not self.slideshow_profile["is_timeout_special"]:
                             self.slideshow_profile["timeout"] = self.slideshow_profile["a_time"]
-                            logger.debug("use answer timeout (q=a): " + debug_card_question)
+                            # logger.debug("use answer timeout (q=a): " + debug_card_question)
                         else:
                             self.slideshow_profile["timeout"] = self.slideshow_profile["special_timeout"]
-                            logger.debug("use special_timeout (q=a): " + debug_card_question)
+                            # logger.debug("use special_timeout (q=a): " + debug_card_question)
                 else:
                     self.slideshow_profile["is_showing_question"] = False
                     self.slideshow_profile["is_timeout_special"] = False
@@ -169,22 +171,22 @@ class SlideshowPreviewThread(QRunnable):
                     if self.external_media_show_completed_notice:
                         # showing external media
                         self.slideshow_profile["timeout"] = 60 * 60 * 24
-                        logger.debug("timeout - wait for ext media play: " + debug_card_question)
+                        # logger.debug("timeout - wait for ext media play: " + debug_card_question)
                     else:
                         # still need this because question may not be showed in the process
                         for tag in self.browser.card.note().tags:
                             match = timeout_in_tag_pattern.match(tag)
                             if match:
-                                logger.debug("Card with time tag: %s" % tag + debug_card_question)
+                                # logger.debug("Card with time tag: %s" % tag + debug_card_question)
                                 self.slideshow_profile["is_timeout_special"] = True
                                 self.slideshow_profile["special_timeout"] = int(match.group(1))
                                 break
                         if not self.slideshow_profile["is_timeout_special"]:
                             self.slideshow_profile["timeout"] = self.slideshow_profile["a_time"]
-                            logger.debug("use answer timeout: " + debug_card_question)
+                            # logger.debug("use answer timeout: " + debug_card_question)
                         else:
                             self.slideshow_profile["timeout"] = self.slideshow_profile["special_timeout"]
-                            logger.debug("use special_timeout: " + debug_card_question)
+                            # logger.debug("use special_timeout: " + debug_card_question)
             else:
                 if self.external_media_show_completed_notice and self.external_media_show_completed_notice.is_set():
                     self.slideshow_profile["timeout"] = 0
@@ -213,14 +215,16 @@ class SlideshowPreviewThread(QRunnable):
             # there is external media in this card
             # logger.debug("Card with Slideshow_External_Media field: '%s'" % c._getQA()['q'])
             path = note["Slideshow_External_Media"].strip()
-            if logger.level == logging.DEBUG:
-                if app_version_micro() >= 20:
-                    debug_card_question = c.render_output().question_text
-                else:
-                    debug_card_question = c._getQA()['q']
-            else:
-                debug_card_question = ''
-            logger.debug("Card '%s' External_Media field: '%s'" % (debug_card_question, path))
+            # if logger.level == logging.DEBUG:
+            #     if app_version_micro() >= 20:
+            #         debug_card_question = c.render_output().question_text
+            #     else:
+            #         debug_card_question = c._getQA()['q']
+            # else:
+            #     debug_card_question = ''
+            debug_card_question = ''
+            
+            # logger.debug("Card '%s' External_Media field: '%s'" % (debug_card_question, path))
             if not path:
                 if self.slideshow_profile["external_media_show_mode"] == "on_and_backoff_if_empty":
                     self.signals.request_change_windows_stack_signal.emit("preview_window")

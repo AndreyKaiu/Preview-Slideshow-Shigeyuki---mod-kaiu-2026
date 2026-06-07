@@ -1400,6 +1400,7 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
     def toggle_on_top(checked):
         global config
         nonlocal gl
+        gl.preview_window.hide()
         gl.preview_window.setWindowFlag(
             Qt.WindowType.WindowStaysOnTopHint,
             checked
@@ -1407,8 +1408,9 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
         try:
             mcon.set_gs("WindowStaysOnTop", "1" if checked else "")            
         except:
-            pass
+            pass        
         gl.preview_window.show()
+        #QTimer.singleShot(0, lambda: gl.preview_window.show())
        
     loc = mcon.get_loc("On_top_of_all_windows", "On top of all windows")
     btn_pin = mini_btn("📌", tooltip=loc, checkable=True)

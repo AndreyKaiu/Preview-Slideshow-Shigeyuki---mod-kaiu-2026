@@ -55,6 +55,7 @@
 2. This add-on is licensed under GPL v3, or higher
 
 ## VERSIONS
+- 0.9, date: 2026-06-07.  More stable display has been made for Anki version 2026_b2.
 - 0.9, date: 2026-06-06.  Forgotten frame near the button.
 - 0.9, date: 2026-05-12.  Fixed the appearance of buttons under dark and light themes.
 - 0.9, date: 2026-03-01.

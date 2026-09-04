@@ -17,14 +17,21 @@
 
 
 import os
+import re
+import inspect
 import time
 import random
 import logging
 import anki.lang
+from anki.lang import without_unicode_isolation
 import json
+import functools
 from threading import Event
+from aqt.sound import av_player, play_clicked_audio
+from anki import version as anki_version
 
 from aqt.qt import QItemDelegate, QBrush, QPalette, QStyleOptionViewItem, QApplication, QColor, QPen, QWidget, QCheckBox, QCursor, QDialog, QFileDialog, QInputDialog, QMenu, QPushButton, QScrollArea, QSizePolicy, QSlider, QThreadPool, QToolTip, QVBoxLayout,QTimer, Qt
+from google.protobuf.json_format import MessageToDict
 
 from aqt import sip
 from aqt import mw, appVersion
@@ -33,6 +40,13 @@ from aqt.browser import Browser
 from aqt.browser.previewer import Previewer
 from aqt.browser.previewer import MultiCardPreviewer
 from aqt.utils import (showText, showInfo, tooltip, tr) 
+from aqt.utils import (  
+    ensure_editor_saved,
+    no_arg_trigger,    
+    skip_if_selection_is_empty   
+)
+
+from datetime import datetime, timedelta
 
 from anki.consts import *
 from . import config_addon as mcon
@@ -41,12 +55,30 @@ from aqt.browser.table.table import Table
 from aqt.switch import Switch
 from aqt.qt import qconnect
 from anki.collection import BrowserRow
+from anki.collection import Collection, Config
 # from aqt.browser.table.table import StatusDelegate
 from aqt import colors
 from aqt.theme import theme_manager
 # import copy
 from aqt import gui_hooks
 
+from aqt.operations.tag import (
+    add_tags_to_notes,
+    clear_unused_tags,
+    remove_tags_from_notes,
+)
+from aqt.operations.card import set_card_deck, set_card_flag
+from aqt.operations.scheduling import (
+    bury_cards,
+    forget_cards,
+    grade_now,
+    reposition_new_cards_dialog,
+    set_due_date_dialog,
+    suspend_cards,
+    unbury_cards,
+    unsuspend_cards,
+)
+from anki.scheduler.base import ScheduleCardsAsNew
 
 # Low-level Qt classes (layout engine) take like this
 try:
@@ -240,6 +272,7 @@ class MyPrev():
         self.icon_play = None
         self.icon_pause = None
         self.icon_step = None
+        self.btn_grade = None
         self.history = Browserhistory()
 
 
@@ -282,6 +315,90 @@ else:
     EXTERNAL_MEDIA_ROOT = ""
 
 
+_orig_render_scheduled = Previewer._render_scheduled
+def new_render_scheduled(self) -> None:
+    self.cancel_timer()
+    self._last_render = time.time()
+
+    if not self._open:
+        return
+    c = self.card()
+    self._update_flag_and_mark_icons(c)
+    func = "_showQuestion"
+    ans_txt = ""
+    if not c:
+        txt = tr.qt_misc_please_select_1_card()
+        bodyclass = ""
+        self._last_state = None
+    else:
+        if self._show_both_sides:
+            self._state = "answer"
+        elif self._card_changed:
+            self._state = "question"
+
+        currentState = self._state_and_mod()
+        if currentState == self._last_state:
+            # nothing has changed, avoid refreshing
+            return
+
+        # need to force reload even if answer
+        txt = c.question(reload=True)
+        ans_txt = c.answer()
+
+        if self._state == "answer":
+            func = "_showAnswer"
+            txt = ans_txt
+        if hasattr(self, 'type_ans_preview_filter'): # ver 26
+            txt = self.type_ans_preview_filter(txt, self._state)
+        else: # ver 25
+            txt = re.sub(r"\[\[type:[^]]+\]\]", "", txt)
+
+        bodyclass = theme_manager.body_classes_for_card_ord(c.ord)
+
+        assert self._web is not None
+
+        if c.autoplay():
+            self._web.setPlaybackRequiresGesture(False)
+            if self._show_both_sides:
+                note = c.note()
+                model = note.model()
+                tmpl = model['tmpls'][c.ord]
+                afmt = tmpl['afmt']
+                if "{{FrontSide}}" in afmt:
+                    # if we're showing both sides at once, remove any audio
+                    # from the answer that's appeared on the question already
+                    question_audio = c.question_av_tags()
+                    only_on_answer_audio = [
+                        x for x in c.answer_av_tags() if x not in question_audio
+                    ]
+                    audio = question_audio + only_on_answer_audio
+                else:
+                    audio = c.answer_av_tags()
+            elif self._state == "question":
+                audio = c.question_av_tags()
+            else:
+                audio = c.answer_av_tags()
+        else:
+            audio = []
+            self._web.setPlaybackRequiresGesture(True)
+        gui_hooks.av_player_will_play_tags(audio, self._state, self)
+        av_player.play_tags(audio)
+        txt = self.mw.prepare_card_text_for_display(txt)
+        txt = gui_hooks.card_will_show(txt, c, f"preview{self._state.capitalize()}")
+        self._last_state = self._state_and_mod()
+
+    js: str
+    if self._state == "question":
+        ans_txt = self.mw.col.media.escape_media_filenames(ans_txt)
+        js = f"{func}({json.dumps(txt)}, {json.dumps(ans_txt)}, '{bodyclass}');"
+    else:
+        js = f"{func}({json.dumps(txt)}, '{bodyclass}');"
+
+    assert self._web is not None
+    self._web.eval(js)
+    self._card_changed = False
+
+Previewer._render_scheduled = new_render_scheduled
 
 
 _orig_open = Previewer.open
@@ -324,8 +441,6 @@ def setup_preview_slideshow(browser:Browser):
     browser.onTogglePreview = onTogglePreview
 
         
-
-    # 2025-12-30    
 
     def update_preview_title(browserPT: Browser):        
         preview = browserPT._previewer
@@ -374,11 +489,118 @@ def setup_preview_slideshow(browser:Browser):
         totasubv = total-gl.viewed-1
         if totasubv < 0:
             totasubv = 0 
-        preview.setWindowTitle(
-            f"{preview._orig_title}  {current} .. {total} (+{total-current});  👁: {gl.viewed+1} (+{totasubv})"
-        )
+
+
+        def get_current_card():            
+            try:
+                return preview.card()
+            except TypeError:            
+                return None # just in case the API changes    
+
+        
+        def get_due_from_card_info(browserPT: Browser, card) -> str:
+            """
+            Gets the Due from card_stats_data, taking into account all cases:
+            -Regular cards: dueDate (timestamp) → formatted date
+            -New cards: duePosition ≥ 0 → "New #N"
+            -Filtered decks: duePosition < 0 → "filtered"
+            -Bury/Suspend: wrapped in parentheses
+            """
+            if not card:
+                return "?"
+            
+            try:
+                proto_info = browserPT.col.card_stats_data(card.id)
+                info = MessageToDict(proto_info)
+
+                is_buried_or_suspended = False        
+                if hasattr(card, 'queue'):
+                    queue = card.queue
+                    if queue in [-1, -2, -3]:
+                        is_buried_or_suspended = True
+                        # print(f"  🔍 Bury/Suspend from card.queue: {queue}")
+            
+                # Checking for a filtered deck
+                is_filtered = False
+                due_position = info.get('duePosition')
+                
+                # If duePosition is negative, it is a filtered deck
+                if due_position is not None and due_position < 0:
+                    is_filtered = True
+                                
+                due_text = "?"
+                
+                # 1. If there is a dueDate (Unix timestamp) -a regular card
+                if 'dueDate' in info and info['dueDate']:
+                    try:
+                        timestamp = int(info['dueDate'])
+                        due_date = datetime.fromtimestamp(timestamp)
+                        
+                        # Format as in Browser
+                        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                        due_date_only = due_date.replace(hour=0, minute=0, second=0, microsecond=0)
+                        days = (due_date_only - today).days
+                        
+                        due_date_only_f = due_date_only.strftime('%Y-%m-%d') 
+
+                        if is_buried_or_suspended or is_filtered:
+                            due_date_only_f = f"!!! ({due_date_only_f})" 
+
+                        if days == 0:
+                            due_text = f"{due_date_only_f} {without_unicode_isolation(tr.browsing_today())}"
+                        elif days == 1:
+                            due_text = f"{due_date_only_f} {without_unicode_isolation(tr.statistics_due_tomorrow())}"
+                        elif days == -1:
+                            due_text = f"{due_date_only_f} {without_unicode_isolation(tr.statistics_true_retention_yesterday())}"
+                        elif days > 0:
+                            due_text = f"{due_date_only_f} +{days}d"
+                        else:
+                            due_text = f"{due_date_only_f} -{-days}d ({without_unicode_isolation(tr.browsing_sidebar_overdue())})"
+                            
+                    except Exception as e:
+                        print(f"Error parsing dueDate: {e}")
+                        due_text = str(info['dueDate'])
+                
+                # 2.If there is no dueDate, but there is duePosition
+                elif due_position is not None:
+                    #Filtered deck
+                    if is_filtered:
+                        due_text = f"{without_unicode_isolation(tr.browsing_filtered())}"
+                    else:
+                        # New card
+                        due_text = f"{without_unicode_isolation(tr.statistics_due_for_new_card(due_position))}"
+
+                    if is_buried_or_suspended:    
+                        due_text = f"!!! ({due_text})"
+                
+                # 3. If there's nothing
+                else:
+                    due_text = "?"
+
+                return due_text 
+                    
+            except Exception as e:
+                print(f"Error in get_due_from_card_info: {e}")
+                import traceback
+                traceback.print_exc()
+                return "?"
+
+
+        duename = tr.decks_review_header()
+        card = get_current_card()    
+        proto_info = browserPT.col.card_stats_data(card.id)
+        info = MessageToDict(proto_info)  
+        duevalue = get_due_from_card_info(browserPT, card)
+
+        preview.setWindowTitle(            
+                    f"{preview._orig_title}  {current} .. {total} (+{total-current});  👁: {gl.viewed+1} (+{totasubv});  {duevalue}"
+        )            
 
         gl.idx_row_last_current = current
+
+
+    
+    
 
 
 
@@ -550,6 +772,35 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
             return None # just in case the API changes
        
 
+    
+    def set_flag_of_selected_cards_Prev(flag: int) -> None:
+        nonlocal browser
+        nonlocal gl
+        
+        current_window = gl.preview_window
+
+        if not browser.current_card:
+            return
+        
+        # Checking that there are selected cards
+        if not browser or not browser.selected_cards():
+            return
+
+        # Checking the saving of the editor (emulation ensure_editor_saved)
+        if hasattr(browser, 'editor') and browser.editor:
+            try:
+                browser.editor.save_current_note()
+            except:
+                pass
+
+        # flag needs toggling off?
+        if flag == browser.current_card.user_flag():
+            flag = 0
+
+        set_card_flag(
+            parent=current_window, card_ids=browser.selected_cards(), flag=flag
+        ).run_in_background(initiator=browser)
+
 
     def set_flag(flag_number: int):
         nonlocal browser
@@ -561,7 +812,7 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
             # card.setUserFlag(flag_number)
             # mw.col.update_card(card)
             if browser:
-                browser.set_flag_of_selected_cards(flag_number)
+                set_flag_of_selected_cards_Prev(flag_number)
 
 
 
@@ -577,7 +828,7 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
         # card.setUserFlag(current)
         # mw.col.update_card(card)
         if browser:
-            browser.set_flag_of_selected_cards(current)
+            set_flag_of_selected_cards_Prev(current)
 
 
     def decrease_flag0():
@@ -589,7 +840,7 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
         # card.setUserFlag(0)
         # mw.col.update_card(card)
         if browser:
-            browser.set_flag_of_selected_cards(0)
+            set_flag_of_selected_cards_Prev(0)
 
 
     def increase_flag():
@@ -602,7 +853,7 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
         if current < 7:
             current = current + 1
         if browser:
-            browser.set_flag_of_selected_cards(current)
+            set_flag_of_selected_cards_Prev(current)
         
         
     def get_current_card_and_note():
@@ -624,18 +875,151 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
 
 
    
+    
     def change_star_button():
         nonlocal browser
+        nonlocal gl
+        
+        current_window = gl.preview_window
+
         card, note = get_current_card_and_note()
         if not note:
+            return      
+
+        # Checking that there are selected cards
+        if not browser or not browser.selected_cards():
             return
 
+        # Checking the saving of the editor (emulation ensure_editor_saved)
+        if hasattr(browser, 'editor') and browser.editor:
+            try:
+                browser.editor.save_current_note()
+            except:
+                pass  
+        
         if note.has_tag(MARKED_TAG):            
-            if browser:
-                browser.toggle_mark_of_selected_notes(checked=False)
-        else:
-            if browser:
-                browser.toggle_mark_of_selected_notes(checked=True)
+            remove_tags_from_notes(
+                parent=current_window,
+                note_ids=browser.selected_notes(),
+                space_separated_tags=MARKED_TAG
+            ).run_in_background(initiator=browser)            
+            browser.form.actionToggle_Mark.setChecked(False)
+
+        else:                        
+            add_tags_to_notes(
+                parent=current_window,
+                note_ids=browser.selected_notes(),
+                space_separated_tags=MARKED_TAG,
+            ).run_in_background(initiator=browser)            
+            browser.form.actionToggle_Mark.setChecked(True)
+
+    
+    def grade_now_Prev() -> None:
+        """Show dialog to grade selected cards."""
+        nonlocal browser
+        nonlocal gl
+        current_window = gl.preview_window
+
+        # Checking that there are selected cards
+        if not browser or not browser.selected_cards():
+            return
+
+        # Checking the saving of the editor (emulation ensure_editor_saved)
+        if hasattr(browser, 'editor') and browser.editor:
+            try:
+                browser.editor.save_current_note()
+            except:
+                pass
+
+        dialog = QDialog(current_window)
+        dialog.setWindowTitle(tr.actions_grade_now())
+        layout = QHBoxLayout()
+        dialog.setLayout(layout)
+        # Add grade buttons
+        for ease, label in [
+            (1, tr.studying_again()),
+            (2, tr.studying_hard()),
+            (3, tr.studying_good()),
+            (4, tr.studying_easy()),
+        ]:
+            btn = QPushButton(label)
+
+            def cb(ease: int) -> None:
+                if 'dialog' in inspect.signature(grade_now).parameters: # ver 25
+                    grade_now(
+                        parent=current_window, card_ids=browser.selected_cards(), ease=ease, dialog=dialog
+                    )
+                else: # ver 26
+                    grade_now(
+                        parent=current_window, card_ids=browser.selected_cards(), ease=ease
+                    ).run_in_background(initiator=browser)
+                    dialog.accept()
+
+            qconnect(
+                btn.clicked,
+                functools.partial(cb, ease=ease),
+            )
+            if key := mw.pm.get_answer_key(ease):
+                QShortcut(key, dialog, activated=btn.click)  # type: ignore
+                btn.setToolTip(tr.actions_shortcut_key(key))
+            layout.addWidget(btn)
+
+        # Add cancel button
+        cancel_btn = QPushButton(tr.actions_cancel())
+        qconnect(cancel_btn.clicked, dialog.reject)
+        layout.addWidget(cancel_btn)
+
+        dialog.exec()
+
+   
+    
+    def set_due_date_Prev() -> None:
+        nonlocal browser
+        nonlocal gl        
+        current_window = gl.preview_window
+
+        # Checking that there are selected cards
+        if not browser or not browser.selected_cards():
+            return
+
+        # Checking the saving of the editor (emulation ensure_editor_saved)
+        if hasattr(browser, 'editor') and browser.editor:
+            try:
+                browser.editor.save_current_note()
+            except:
+                pass
+
+        if op := set_due_date_dialog(
+            parent=current_window,
+            card_ids=browser.selected_cards(),
+            config_key=Config.String.SET_DUE_BROWSER,
+        ):
+            op.run_in_background(initiator=browser)
+    
+
+      
+    def forget_cards_Prev() -> None:
+        nonlocal browser
+        nonlocal gl
+        current_window = gl.preview_window
+
+        # Checking that there are selected cards
+        if not browser or not browser.selected_cards():
+            return
+
+        # Checking the saving of the editor (emulation ensure_editor_saved)
+        if hasattr(browser, 'editor') and browser.editor:
+            try:
+                browser.editor.save_current_note()
+            except:
+                pass
+
+        if op := forget_cards(
+            parent=current_window,
+            card_ids=browser.selected_cards(),
+            context=ScheduleCardsAsNew.Context.BROWSER,
+        ):
+            op.run_in_background(initiator=browser)
             
 
     def setup_preview_shortcuts(prev_window):
@@ -686,6 +1070,26 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
                 activated=lambda i=i: set_flag(i)
                 )
             
+        QShortcut(
+            QKeySequence("Ctrl+Shift+G"),
+            prev_window,
+            activated=grade_now_Prev          
+        )
+
+        QShortcut(
+            QKeySequence("Ctrl+Shift+D"),
+            prev_window,
+            activated=set_due_date_Prev          
+        )
+
+        QShortcut(
+            QKeySequence("Ctrl+Alt+N"),
+            prev_window,
+            activated=forget_cards_Prev          
+        )
+        
+        
+
         QShortcut(
             QKeySequence("Alt+Left"),
             prev_window,
@@ -1396,11 +1800,16 @@ def add_slideshow_ui_to_preview_window(browser: Browser):
     gl.btn_step.setEnabled(False)
     gl.btn_step.clicked.connect(request_play_next_slideshow)
     top_layout.addWidget(gl.btn_step)    
-
+    
     top_layout.addSpacing(3)
 
     gl.label_timer = QLabel("0s")    
     top_layout.addWidget(gl.label_timer) 
+
+    gl.btn_grade = mini_btn("🔢", tooltip=f"{tr.actions_grade_now()} [Ctrl+Shift+G]")
+    top_layout.addWidget(gl.btn_grade)
+    gl.btn_grade.clicked.connect(grade_now_Prev)
+    top_layout.addWidget(gl.btn_grade) 
 
 
     def toggle_on_top(checked):
